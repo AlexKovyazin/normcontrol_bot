@@ -6,7 +6,6 @@ from config import TOKEN, URL, DATABASE, USER, PASSWORD, HOST, PORT
 from flask_apscheduler import APScheduler
 from log.log_configs import logger
 
-
 SHOW_STAT_COMMAND = 'НОРМОКОНТРОЛЬ, ЁБАНА, НУЖНА СТАТИСТИКА'
 bot = telebot.TeleBot(TOKEN)
 server = Flask(__name__)
@@ -46,18 +45,37 @@ def count_messages(message):
     last_name = message.from_user.last_name
     chat_id = message.chat.id
 
-    cursor.execute(f'SELECT * FROM users WHERE telegram_id={sender_id} AND chat_id={chat_id}')
+    cursor.execute(
+        'SELECT * FROM users WHERE telegram_id=:sender_id AND chat_id=:chat_id',
+        {
+            'sender_id': sender_id,
+            'chat_id': chat_id
+        })
     user = cursor.fetchone()
 
     if not user:
         message_count = 1
-        cursor.execute(f'INSERT INTO users (telegram_id, username, firstname, lastname, message_count, chat_id) '
-                       f'VALUES({sender_id}, {username}, {first_name}, {last_name}, {message_count}, {chat_id})')
+        cursor.execute(
+            'INSERT INTO users (telegram_id, username, firstname, lastname, message_count, chat_id) '
+            'VALUES(:sender_id, :username, :first_name, :last_name, :message_count, :chat_id)',
+            {
+                'sender_id': sender_id,
+                'username': username,
+                'first_name': first_name,
+                'last_name': last_name,
+                'message_count': message_count,
+                'chat_id': chat_id
+            })
         connection.commit()
         logger.debug(f'User with telegram id {sender_id} was added to DB')
     else:
-        cursor.execute(f'UPDATE users SET message_count = message_count + 1 '
-                       f'WHERE telegram_id = {sender_id} AND chat_id={chat_id}')
+        cursor.execute(
+            'UPDATE users SET message_count = message_count + 1 '
+            'WHERE telegram_id = :sender_id AND chat_id=:chat_id',
+            {
+                'sender_id': sender_id,
+                'chat_id': chat_id
+            })
         connection.commit()
         logger.debug(f'Message counter for user with telegram id {sender_id} was updated')
 
@@ -84,7 +102,7 @@ def show_stat(message):
 
     # Готовим список строк, который будет использоваться формирования сообщения
     for key, value in users_stat.items():
-        message_list.append(f'{key} - {value}\n')
+        message_list.append(f'{key}: {value}\n')
 
     # Формируем и отправляем сообщение
     stat = ''.join(message_list)
