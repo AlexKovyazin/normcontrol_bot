@@ -1,10 +1,11 @@
 import os
+import sys
 import telebot
 import psycopg2
 from flask import Flask, request
 from config import TOKEN, URL, DATABASE, USER, PASSWORD, HOST, PORT
 from flask_apscheduler import APScheduler
-from log.log_configs import logger
+import logging
 
 SHOW_STAT_COMMAND = 'НОРМОКОНТРОЛЬ, ЁБАНА, НУЖНА СТАТИСТИКА'
 bot = telebot.TeleBot(TOKEN)
@@ -18,6 +19,14 @@ connection = psycopg2.connect(
 )
 cursor = connection.cursor()
 scheduler = APScheduler()
+
+formatter = logging.Formatter('%(asctime)s\t%(levelname)s\t%(filename)s\t%(message)s')
+handler = logging.StreamHandler(sys.stdout)
+handler.setLevel(logging.DEBUG)
+handler.setFormatter(formatter)
+logger = logging.getLogger('bot')
+logger.setLevel(logging.DEBUG)
+logger.addHandler(handler)
 
 
 @server.route("/")
@@ -44,38 +53,23 @@ def count_messages(message):
     first_name = message.from_user.first_name
     last_name = message.from_user.last_name
     chat_id = message.chat.id
+    logger.debug(f'Users data was received')
 
     cursor.execute(
-        'SELECT * FROM users WHERE telegram_id=:sender_id AND chat_id=:chat_id',
-        {
-            'sender_id': sender_id,
-            'chat_id': chat_id
-        })
+        'SELECT * FROM users WHERE telegram_id = ? AND chat_id = ?', (sender_id, chat_id))
     user = cursor.fetchone()
 
     if not user:
         message_count = 1
         cursor.execute(
             'INSERT INTO users (telegram_id, username, firstname, lastname, message_count, chat_id) '
-            'VALUES(:sender_id, :username, :first_name, :last_name, :message_count, :chat_id)',
-            {
-                'sender_id': sender_id,
-                'username': username,
-                'first_name': first_name,
-                'last_name': last_name,
-                'message_count': message_count,
-                'chat_id': chat_id
-            })
+            'VALUES(?, ?, ?, ?, ?, ?)', (sender_id, username, first_name, last_name, message_count, chat_id))
         connection.commit()
         logger.debug(f'User with telegram id {sender_id} was added to DB')
     else:
         cursor.execute(
             'UPDATE users SET message_count = message_count + 1 '
-            'WHERE telegram_id = :sender_id AND chat_id=:chat_id',
-            {
-                'sender_id': sender_id,
-                'chat_id': chat_id
-            })
+            'WHERE telegram_id = ? AND chat_id = ?', (sender_id, chat_id))
         connection.commit()
         logger.debug(f'Message counter for user with telegram id {sender_id} was updated')
 
