@@ -7,9 +7,12 @@ from config import TOKEN, URL, DATABASE, USER, PASSWORD, HOST, PORT
 from flask_apscheduler import APScheduler
 import logging
 
+
 SHOW_STAT_COMMAND = 'НОРМОКОНТРОЛЬ, ЁБАНА, НУЖНА СТАТИСТИКА'
+
 bot = telebot.TeleBot(TOKEN)
 server = Flask(__name__)
+
 connection = psycopg2.connect(
     dbname=DATABASE,
     user=USER,
@@ -18,7 +21,6 @@ connection = psycopg2.connect(
     port=PORT,
 )
 cursor = connection.cursor()
-scheduler = APScheduler()
 
 formatter = logging.Formatter('%(asctime)s\t%(levelname)s\t%(filename)s\t%(message)s')
 handler = logging.StreamHandler(sys.stdout)
@@ -27,6 +29,8 @@ handler.setFormatter(formatter)
 logger = logging.getLogger('bot')
 logger.setLevel(logging.DEBUG)
 logger.addHandler(handler)
+
+scheduler = APScheduler()
 
 
 @server.route("/")
@@ -77,7 +81,7 @@ def count_messages(message):
 def reset_msg_counter():
     cursor.execute(f'UPDATE users SET message_count = 0')
     connection.commit()
-    logger.info(f'Message counts was cleaned by reset_msg_counter()')
+    logger.info(f'Messages counts was cleaned by reset_msg_counter()')
 
 
 @bot.message_handler(func=lambda message: message.text == SHOW_STAT_COMMAND)
@@ -92,7 +96,7 @@ def show_stat(message):
         firstname = user[3]
         lastname = user[4]
         message_count = user[5]
-        users_stat[f'{username}-{firstname} {lastname}'] = message_count
+        users_stat[f'{username} | {firstname} {lastname}'] = message_count
 
     # Готовим список строк, который будет использоваться формирования сообщения
     for key, value in users_stat.items():
@@ -108,4 +112,3 @@ if __name__ == "__main__":
     scheduler.add_job(id='data_r_mess_new', func=reset_msg_counter, trigger='cron', hour=19, minute=0, second=0)
     scheduler.start()
     logger.debug(f'Thread was started')
-
