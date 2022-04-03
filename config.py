@@ -1,5 +1,7 @@
 TOKEN = '2108392950:AAHNePPNGmIbDuLuGPTUHuJKBdFDeWXZfdQ'
 URL = 'https://normcontrolbot.herokuapp.com/'
+
+#Database
 HOST = 'ec2-63-35-156-160.eu-west-1.compute.amazonaws.com'
 DATABASE = 'd6m2902kvhirdq'
 USER = 'uhsyrrueybiiph'

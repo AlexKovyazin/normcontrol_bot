@@ -28,6 +28,11 @@ def get_message():
     return "!", 200
 
 
+@bot.message_handler(commands=['start'])
+def start(message):
+    bot.reply_to(message, 'Hello, ' + message.from_user.first_name)
+
+
 @bot.message_handler(content_types=['audio', 'photo', 'voice', 'video', 'document',
                                     'text', 'location', 'contact', 'sticker'],
                      func=lambda message: message.text != SHOW_STAT_COMMAND)
