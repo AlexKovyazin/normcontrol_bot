@@ -104,7 +104,6 @@ def show_stat(message):
 
 
 if __name__ == "__main__":
-    count_messages()
     server.run(host="0.0.0.0", port=int(os.environ.get('PORT', 5000)))
     scheduler.add_job(id='data_r_mess_new', func=reset_msg_counter, trigger='cron', hour=19, minute=0, second=0)
     scheduler.start()
