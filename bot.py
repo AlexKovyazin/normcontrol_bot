@@ -53,23 +53,23 @@ def count_messages(message):
     first_name = message.from_user.first_name
     last_name = message.from_user.last_name
     chat_id = message.chat.id
-    logger.debug(f'Users data was received')
+    logger.debug(f"User's data was received")
 
     cursor.execute(
-        'SELECT * FROM users WHERE telegram_id = ? AND chat_id = ?', (sender_id, chat_id))
+        'SELECT * FROM users WHERE telegram_id = %s AND chat_id = %s', (sender_id, chat_id))
     user = cursor.fetchone()
 
     if not user:
         message_count = 1
         cursor.execute(
             'INSERT INTO users (telegram_id, username, firstname, lastname, message_count, chat_id) '
-            'VALUES(?, ?, ?, ?, ?, ?)', (sender_id, username, first_name, last_name, message_count, chat_id))
+            'VALUES(%s, %s, %s, %s, %s, %s)', (sender_id, username, first_name, last_name, message_count, chat_id))
         connection.commit()
         logger.debug(f'User with telegram id {sender_id} was added to DB')
     else:
         cursor.execute(
             'UPDATE users SET message_count = message_count + 1 '
-            'WHERE telegram_id = ? AND chat_id = ?', (sender_id, chat_id))
+            'WHERE telegram_id = %s AND chat_id = %s', (sender_id, chat_id))
         connection.commit()
         logger.debug(f'Message counter for user with telegram id {sender_id} was updated')
 
@@ -104,7 +104,9 @@ def show_stat(message):
 
 
 if __name__ == "__main__":
+    count_messages()
     server.run(host="0.0.0.0", port=int(os.environ.get('PORT', 5000)))
     scheduler.add_job(id='data_r_mess_new', func=reset_msg_counter, trigger='cron', hour=19, minute=0, second=0)
     scheduler.start()
     logger.debug(f'Thread was started')
+
