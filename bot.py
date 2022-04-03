@@ -1,16 +1,24 @@
 import os
 import telebot
+import psycopg2
 from flask import Flask, request
-from config import TOKEN, URL
+from config import TOKEN, URL, DATABASE, USER, PASSWORD, HOST, PORT
+from flask_apscheduler import APScheduler
+from log.log_configs import logger
 
 
 SHOW_STAT_COMMAND = 'НОРМОКОНТРОЛЬ, ЁБАНА, НУЖНА СТАТИСТИКА'
-
 bot = telebot.TeleBot(TOKEN)
 server = Flask(__name__)
-
-# Глобальный счетчик сообщений
-counter = {}
+connection = psycopg2.connect(
+    dbname=DATABASE,
+    user=USER,
+    password=PASSWORD,
+    host=HOST,
+    port=PORT,
+)
+cursor = connection.cursor()
+scheduler = APScheduler()
 
 
 @server.route("/")
@@ -28,50 +36,63 @@ def get_message():
     return "!", 200
 
 
-@bot.message_handler(commands=['start'])
-def start(message):
-    bot.reply_to(message, 'Hello, ' + message.from_user.first_name)
-
-
 @bot.message_handler(content_types=['audio', 'photo', 'voice', 'video', 'document',
                                     'text', 'location', 'contact', 'sticker'],
                      func=lambda message: message.text != SHOW_STAT_COMMAND)
 def count_messages(message):
-    global counter
+    sender_id = message.from_user.id
+    username = message.from_user.username
     first_name = message.from_user.first_name
     last_name = message.from_user.last_name
+    chat_id = message.chat.id
 
-    if not last_name:
-        user_key = first_name
-    else:
-        user_key = f'{first_name} ' + f'{last_name}'
+    cursor.execute(f'SELECT * FROM users WHERE telegram_id={sender_id} AND chat_id={chat_id}')
+    user = cursor.fetchone()
 
-    if counter.get(user_key):
-        counter[user_key] += 1
+    if not user:
+        message_count = 1
+        cursor.execute(f'INSERT INTO users (telegram_id, username, firstname, lastname, message_count, chat_id) '
+                       f'VALUES({sender_id}, {username}, {first_name}, {last_name}, {message_count}, {chat_id})')
+        connection.commit()
+        logger.debug(f'User with telegram id {sender_id} was added to DB')
     else:
-        counter[user_key] = 1
+        cursor.execute(f'UPDATE users SET message_count = message_count + 1 '
+                       f'WHERE telegram_id = {sender_id} AND chat_id={chat_id}')
+        connection.commit()
+        logger.debug(f'Message counter for user with telegram id {sender_id} was updated')
+
+
+def reset_msg_counter():
+    cursor.execute(f'UPDATE users SET message_count = 0')
+    connection.commit()
+    logger.info(f'Message counts was cleaned by reset_msg_counter()')
 
 
 @bot.message_handler(func=lambda message: message.text == SHOW_STAT_COMMAND)
 def show_stat(message):
-    global counter
+    users_stat = {}
     message_list = []
-    sorted_counter = {}
-    sorted_counter_keys = sorted(counter, key=counter.get, reverse=True)
 
-    # Сортируем пользователей в словаре по количеству отправленных сообщений
-    for key in sorted_counter_keys:
-        sorted_counter[key] = counter[key]
+    cursor.execute('SELECT * FROM users ORDER BY message_count DESC LIMIT 5')
+    users_data = cursor.fetchall()
+    for user in users_data:
+        username = user[2]
+        firstname = user[3]
+        lastname = user[4]
+        message_count = user[5]
+        users_stat[f'{username}-{firstname} {lastname}'] = message_count
 
     # Готовим список строк, который будет использоваться формирования сообщения
-    for username, message_count in sorted_counter.items():
-        message_list.append(f'{username} - {message_count}\n')
+    for key, value in users_stat.items():
+        message_list.append(f'{key} - {value}\n')
 
-    # Формируем сообщение
+    # Формируем и отправляем сообщение
     stat = ''.join(message_list)
-
     bot.send_message(message.chat.id, stat)
 
 
 if __name__ == "__main__":
     server.run(host="0.0.0.0", port=int(os.environ.get('PORT', 5000)))
+    scheduler.add_job(id='data_r_mess_new', func=reset_msg_counter, trigger='cron', hour=19, minute=0, second=0)
+    scheduler.start()
+    logger.debug(f'Thread was started')
