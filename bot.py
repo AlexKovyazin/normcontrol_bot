@@ -64,6 +64,7 @@ def count_messages(message):
     user = cursor.fetchone()
 
     if not user:
+        logger.debug(f"User {username} is not in DB")
         message_count = 1
         cursor.execute(
             'INSERT INTO users (telegram_id, username, firstname, lastname, message_count, chat_id) '
@@ -71,6 +72,7 @@ def count_messages(message):
         connection.commit()
         logger.debug(f'User with telegram id {sender_id} was added to DB')
     else:
+        logger.debug(f"User {username} already is in DB")
         cursor.execute(
             'UPDATE users SET message_count = message_count + 1 '
             'WHERE telegram_id = %s AND chat_id = %s', (sender_id, chat_id))
@@ -89,7 +91,11 @@ def show_stat(message):
     users_stat = {}
     message_list = []
 
-    cursor.execute('SELECT * FROM users ORDER BY message_count DESC LIMIT 5')
+    cursor.execute("""SELECT * 
+                        FROM users 
+                       WHERE chat_id = -556566361 
+                    ORDER BY message_count 
+                        DESC LIMIT 5""")
     users_data = cursor.fetchall()
     for user in users_data:
         username = user[2]
