@@ -16,7 +16,7 @@ logger = logging.getLogger('bot')
 sched = BlockingScheduler()
 
 
-@sched.scheduled_job('cron', hour=24)
+@sched.scheduled_job('cron', hour=17)
 def reset_msg_counter():
     cursor.execute(f'UPDATE users SET message_count = 0')
     connection.commit()
