@@ -80,7 +80,8 @@ def count_messages(message):
         # Message count checking
         cursor.execute("""SELECT message_count 
                             FROM users 
-                           WHERE telegram_id = %s""", (sender_id,)
+                           WHERE telegram_id = %s
+                             AND chat_id = %s""", (sender_id, chat_id,)
                        )
         users_msg_count = cursor.fetchone()[0]
         if users_msg_count > 20:
