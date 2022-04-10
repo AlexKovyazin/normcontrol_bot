@@ -1,36 +1,15 @@
 import os
-import sys
 import telebot
-import psycopg2
 from flask import Flask, request
-from config import TOKEN, URL, DATABASE, USER, PASSWORD, HOST, PORT
-from flask_apscheduler import APScheduler
-import logging
+from config import TOKEN, URL
+from config import pg_connect, logger
 
 
 SHOW_STAT_COMMAND = 'НОРМОКОНТРОЛЬ, ЁБАНА, НУЖНА СТАТИСТИКА'
 
 bot = telebot.TeleBot(TOKEN)
 server = Flask(__name__)
-
-connection = psycopg2.connect(
-    dbname=DATABASE,
-    user=USER,
-    password=PASSWORD,
-    host=HOST,
-    port=PORT,
-)
-cursor = connection.cursor()
-
-formatter = logging.Formatter('%(asctime)s\t%(levelname)s\t%(filename)s\t%(message)s')
-handler = logging.StreamHandler(sys.stdout)
-handler.setLevel(logging.DEBUG)
-handler.setFormatter(formatter)
-logger = logging.getLogger('bot')
-logger.setLevel(logging.DEBUG)
-logger.addHandler(handler)
-
-scheduler = APScheduler()
+connection, cursor = pg_connect()
 
 
 @server.route("/")
@@ -42,6 +21,10 @@ def webhook():
 
 @server.route('/' + TOKEN, methods=['POST'])
 def get_message():
+    """
+    Process message with Flask
+    :return: response
+    """
     json_string = request.get_data().decode('utf-8')
     update = telebot.types.Update.de_json(json_string)
     bot.process_new_updates([update])
@@ -52,6 +35,11 @@ def get_message():
                                     'text', 'location', 'contact', 'sticker'],
                      func=lambda message: message.text != SHOW_STAT_COMMAND)
 def count_messages(message):
+    """
+    Collect message info, insert/update DB data
+    :param message: User's sent message
+    :return: None
+    """
     sender_id = message.from_user.id
     username = message.from_user.username
     first_name = message.from_user.first_name
@@ -64,30 +52,27 @@ def count_messages(message):
     user = cursor.fetchone()
 
     if not user:
-        logger.debug(f"User {username} is not in DB")
         message_count = 1
         cursor.execute(
             'INSERT INTO users (telegram_id, username, firstname, lastname, message_count, chat_id) '
             'VALUES(%s, %s, %s, %s, %s, %s)', (sender_id, username, first_name, last_name, message_count, chat_id))
         connection.commit()
-        logger.debug(f'User with telegram id {sender_id} was added to DB')
+        logger.debug(f'User with username {username} was added to DB')
     else:
-        logger.debug(f"User {username} already is in DB")
         cursor.execute(
             'UPDATE users SET message_count = message_count + 1 '
             'WHERE telegram_id = %s AND chat_id = %s', (sender_id, chat_id))
         connection.commit()
-        logger.debug(f'Message counter for user with telegram id {sender_id} was updated')
-
-
-def reset_msg_counter():
-    cursor.execute(f'UPDATE users SET message_count = 0')
-    connection.commit()
-    logger.info(f'Messages counts was cleaned by reset_msg_counter()')
+        logger.debug(f'Message counter for user with username {username} was updated')
 
 
 @bot.message_handler(func=lambda message: message.text == SHOW_STAT_COMMAND)
 def show_stat(message):
+    """
+    Send message with top 5 users with the highest message counter values
+    :param message: SHOW_STAT_COMMAND
+    :return: None
+    """
     users_stat = {}
     message_list = []
 
@@ -104,17 +89,14 @@ def show_stat(message):
         message_count = user[5]
         users_stat[f'{username} | {firstname} {lastname}'] = message_count
 
-    # Готовим список строк, который будет использоваться формирования сообщения
+    # Prepare list of strings which will be used for message body forming
     for key, value in users_stat.items():
         message_list.append(f'{key}: {value}\n')
 
-    # Формируем и отправляем сообщение
+    # Making and send message
     stat = ''.join(message_list)
     bot.send_message(message.chat.id, stat)
 
 
 if __name__ == "__main__":
     server.run(host="0.0.0.0", port=int(os.environ.get('PORT', 5000)))
-    scheduler.add_job(id='data_r_mess_new', func=reset_msg_counter, trigger='cron', hour=19, minute=0, second=0)
-    scheduler.start()
-    logger.debug(f'Thread was started')
