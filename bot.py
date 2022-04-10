@@ -6,6 +6,7 @@ from config import pg_connect, logger
 
 
 SHOW_STAT_COMMAND = 'НОРМОКОНТРОЛЬ, ЁБАНА, НУЖНА СТАТИСТИКА'
+MAIN_CHAT_ID = -556566361
 
 bot = telebot.TeleBot(TOKEN)
 server = Flask(__name__)
@@ -48,22 +49,45 @@ def count_messages(message):
     logger.debug(f"User's data was received")
 
     cursor.execute(
-        'SELECT * FROM users WHERE telegram_id = %s AND chat_id = %s', (sender_id, chat_id))
+        """SELECT * 
+             FROM users 
+            WHERE telegram_id = %s 
+              AND chat_id = %s""", (sender_id, chat_id)
+    )
     user = cursor.fetchone()
 
     if not user:
         message_count = 1
         cursor.execute(
-            'INSERT INTO users (telegram_id, username, firstname, lastname, message_count, chat_id) '
-            'VALUES(%s, %s, %s, %s, %s, %s)', (sender_id, username, first_name, last_name, message_count, chat_id))
+            """INSERT INTO users (telegram_id, username, firstname, 
+                                  lastname, message_count, chat_id) 
+                    VALUES (%s, %s, %s, 
+                            %s, %s, %s)""", (sender_id, username, first_name,
+                                             last_name, message_count, chat_id,)
+        )
         connection.commit()
         logger.debug(f'User with username {username} was added to DB')
     else:
         cursor.execute(
-            'UPDATE users SET message_count = message_count + 1 '
-            'WHERE telegram_id = %s AND chat_id = %s', (sender_id, chat_id))
+            """UPDATE users 
+                  SET message_count = message_count + 1 
+                WHERE telegram_id = %s 
+                  AND chat_id = %s""", (sender_id, chat_id,)
+        )
         connection.commit()
         logger.debug(f'Message counter for user with username {username} was updated')
+
+        # Message count checking
+        cursor.execute("""SELECT message_count 
+                            FROM users 
+                           WHERE telegram_id = %s 
+                             AND chat_id = %s""", (sender_id,)
+                       )
+        users_msg_count = cursor.fetchone()[0]
+        if users_msg_count > 20:
+            warning_message = f"{username.upper()}, ПРИГОТОВЬСЯ К АНАЛЬНОЙ КАРЕ!\nХВАТИТ ФЛУДИТЬ!"
+            bot.send_message(message.chat.id, warning_message)
+            logger.debug(f'User with username {username} received warning message')
 
 
 @bot.message_handler(func=lambda message: message.text == SHOW_STAT_COMMAND)
@@ -78,9 +102,10 @@ def show_stat(message):
 
     cursor.execute("""SELECT * 
                         FROM users 
-                       WHERE chat_id = -556566361 
+                       WHERE chat_id = %s 
                     ORDER BY message_count 
-                        DESC LIMIT 5""")
+                        DESC LIMIT 5""", (MAIN_CHAT_ID,)
+                   )
     users_data = cursor.fetchall()
     for user in users_data:
         username = user[2]
