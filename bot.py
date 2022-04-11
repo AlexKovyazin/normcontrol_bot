@@ -86,8 +86,12 @@ def count_messages(message):
                              AND chat_id = %s""", (sender_id, chat_id,)
                        )
         users_msg_count = cursor.fetchone()[0]
-        if users_msg_count > 20:
+        if users_msg_count == 20:
             warning_message = f"{username.upper()}, ПРИГОТОВЬСЯ К АНАЛЬНОЙ КАРЕ!\nХВАТИТ ФЛУДИТЬ!"
+            bot.send_message(message.chat.id, warning_message)
+            logger.debug(f'User with username {username} received warning message')
+        if users_msg_count == 30:
+            warning_message = f"{username.upper()}, КОГДА SOURPASSIONPARTY НАУЧИТ МЕНЯ БАНИТЬ, Я ТЕБЯ ЗАБАНЮ!"
             bot.send_message(message.chat.id, warning_message)
             logger.debug(f'User with username {username} received warning message')
 
