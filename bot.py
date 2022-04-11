@@ -10,7 +10,7 @@ MAIN_CHAT_ID = -556566361
 
 bot = telebot.TeleBot(TOKEN)
 server = Flask(__name__)
-connection, cursor = pg_connect()
+# connection, cursor = pg_connect()
 
 
 @server.route("/")
@@ -41,6 +41,8 @@ def count_messages(message):
     :param message: User's sent message
     :return: None
     """
+    connection, cursor = pg_connect()
+
     sender_id = message.from_user.id
     username = message.from_user.username
     first_name = message.from_user.first_name
@@ -97,6 +99,8 @@ def show_stat(message):
     :param message: SHOW_STAT_COMMAND
     :return: None
     """
+    connection, cursor = pg_connect()
+
     users_stat = {}
     message_list = []
 
