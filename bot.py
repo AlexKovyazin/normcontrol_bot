@@ -62,11 +62,8 @@ def count_messages(message):
         message_count = 1
         if not username:
             cursor.execute(
-                """INSERT INTO users (telegram_id, firstname, 
-                                      lastname, message_count, chat_id) 
-                        VALUES (%s, %s, 
-                                %s, %s, %s)""", (sender_id, first_name,
-                                                 last_name, message_count, chat_id,)
+                """INSERT INTO users (telegram_id, message_count, chat_id) 
+                        VALUES (%s, %s, %s)""", (sender_id, message_count, chat_id,)
             )
         else:
             cursor.execute(
@@ -77,7 +74,7 @@ def count_messages(message):
                                                  last_name, message_count, chat_id,)
             )
         connection.commit()
-        logger.debug(f'User with username {username} was added to DB')
+        logger.debug(f'User with id {sender_id} was added to DB')
     else:
         cursor.execute(
             """UPDATE users 
@@ -86,7 +83,7 @@ def count_messages(message):
                   AND chat_id = %s""", (sender_id, chat_id,)
         )
         connection.commit()
-        logger.debug(f'Message counter for user with username {username} was updated')
+        logger.debug(f'Message counter for user with id {sender_id} was updated')
 
         # Message count checking
         cursor.execute("""SELECT message_count 
