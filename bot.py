@@ -64,7 +64,7 @@ def count_messages(message):
             cursor.execute(
                 """INSERT INTO users (telegram_id, firstname, 
                                       lastname, message_count, chat_id) 
-                        VALUES (%s, %s, %s, 
+                        VALUES (%s, %s, 
                                 %s, %s, %s)""", (sender_id, first_name,
                                                  last_name, message_count, chat_id,)
             )
