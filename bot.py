@@ -60,19 +60,13 @@ def count_messages(message):
 
     if not user:
         message_count = 1
-        if not username:
-            cursor.execute(
-                """INSERT INTO users (telegram_id, message_count, chat_id) 
-                        VALUES (%s, %s, %s)""", (sender_id, message_count, chat_id,)
-            )
-        else:
-            cursor.execute(
-                """INSERT INTO users (telegram_id, username, firstname, 
-                                      lastname, message_count, chat_id) 
-                        VALUES (%s, %s, %s, 
-                                %s, %s, %s)""", (sender_id, username, first_name,
-                                                 last_name, message_count, chat_id,)
-            )
+        cursor.execute(
+            """INSERT INTO users (telegram_id, username, firstname, 
+                                  lastname, message_count, chat_id) 
+                    VALUES (%s, %s, %s, 
+                            %s, %s, %s)""", (sender_id, username, first_name,
+                                             last_name, message_count, chat_id,)
+        )
         connection.commit()
         logger.debug(f'User with id {sender_id} was added to DB')
     else:
@@ -92,14 +86,17 @@ def count_messages(message):
                              AND chat_id = %s""", (sender_id, chat_id,)
                        )
         users_msg_count = cursor.fetchone()[0]
+
+        if not username:
+            username = 'Хэй'
         if users_msg_count == 20:
             warning_message = f"{username.upper()}, ПРИГОТОВЬСЯ К АНАЛЬНОЙ КАРЕ!\nХВАТИТ ФЛУДИТЬ!"
             bot.send_message(message.chat.id, warning_message)
-            logger.debug(f'User with username {username} received warning message')
+            logger.debug(f'User with id {sender_id} received warning message')
         if users_msg_count == 30:
             warning_message = f"{username.upper()}, КОГДА SOURPASSIONPARTY НАУЧИТ МЕНЯ БАНИТЬ, Я ТЕБЯ ЗАБАНЮ!"
             bot.send_message(message.chat.id, warning_message)
-            logger.debug(f'User with username {username} received warning message')
+            logger.debug(f'User with with id {sender_id} received warning message')
 
 
 @bot.message_handler(func=lambda message: message.text == SHOW_STAT_COMMAND)
@@ -122,11 +119,12 @@ def show_stat(message):
                    )
     users_data = cursor.fetchall()
     for user in users_data:
+        user_id = user[1]
         username = user[2]
         firstname = user[3]
         lastname = user[4]
         message_count = user[5]
-        users_stat[f'{username} | {firstname} {lastname}'] = message_count
+        users_stat[f'{user_id} | {username} | {firstname} {lastname}'] = message_count
 
     # Prepare list of strings which will be used for message body forming
     for key, value in users_stat.items():
