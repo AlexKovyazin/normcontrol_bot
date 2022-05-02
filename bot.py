@@ -1,11 +1,15 @@
 import os
 import telebot
+from datetime import datetime, timedelta
 from flask import Flask, request
 from config import TOKEN, URL
 from config import pg_connect, logger
 
 
 SHOW_STAT_COMMAND = 'НОРМОКОНТРОЛЬ, ЁБАНА, НУЖНА СТАТИСТИКА'
+WARNING_MESSAGE = ' ,ТЫ УВЕРЕН, ЧТО НЕ ПИШЕШЬ СЛИШКОМ МНОГО?'
+PRE_MUTE_MESSAGE = ' ,ЕЩЁ 5 СООБЩЕНИЙ И ТЫ НЕ СМОЖЕШЬ ПИСАТЬ 24 ЧАСА'
+MUTE_MESSAGE = 'ТЫ БЫЛ ПРЕДУПРЕЖДЁН'
 MAIN_CHAT_ID = -556566361
 
 bot = telebot.TeleBot(TOKEN)
@@ -32,6 +36,13 @@ def get_message():
     return "!", 200
 
 
+def mute_user(chat_id, user_id):
+    until_date = datetime.now() + timedelta(days=1)
+    bot.restrict_chat_member(chat_id, user_id, until_date=until_date)
+    connection.commit()
+    logger.debug(f'Is_muted field for user with id {user_id} was updated')
+
+
 @bot.message_handler(content_types=['audio', 'photo', 'voice', 'video', 'document',
                                     'text', 'location', 'contact', 'sticker'],
                      func=lambda message: message.text != SHOW_STAT_COMMAND)
@@ -41,8 +52,6 @@ def count_messages(message):
     :param message: User's sent message
     :return: None
     """
-    # connection, cursor = pg_connect()
-
     sender_id = message.from_user.id
     username = message.from_user.username
     first_name = message.from_user.first_name
@@ -89,14 +98,18 @@ def count_messages(message):
 
         if not username:
             username = 'Хэй'
-        if users_msg_count == 20:
-            warning_message = f"{username.upper()}, ПРИГОТОВЬСЯ К АНАЛЬНОЙ КАРЕ!\nХВАТИТ ФЛУДИТЬ!"
+        if users_msg_count == 15:
+            warning_message = username + WARNING_MESSAGE
             bot.send_message(message.chat.id, warning_message)
             logger.debug(f'User with id {sender_id} received warning message')
-        if users_msg_count == 30:
-            warning_message = f"{username.upper()}, КОГДА SOURPASSIONPARTY НАУЧИТ МЕНЯ БАНИТЬ, Я ТЕБЯ ЗАБАНЮ!"
-            bot.send_message(message.chat.id, warning_message)
-            logger.debug(f'User with with id {sender_id} received warning message')
+        if users_msg_count == 20:
+            pre_warning_message = username + PRE_MUTE_MESSAGE
+            bot.send_message(message.chat.id, pre_warning_message)
+            logger.debug(f'User with with id {sender_id} received pre mute message')
+        if users_msg_count == 25:
+            bot.send_message(message.chat.id, MUTE_MESSAGE)
+            mute_user(message.chat.id, message.from_user)
+            logger.debug(f'User with with id {sender_id} was muted')
 
 
 @bot.message_handler(func=lambda message: message.text == SHOW_STAT_COMMAND)
