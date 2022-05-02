@@ -39,8 +39,7 @@ def get_message():
 def mute_user(chat_id, user_id):
     until_date = datetime.now() + timedelta(days=1)
     bot.restrict_chat_member(chat_id, user_id, until_date=until_date)
-    connection.commit()
-    logger.debug(f'Is_muted field for user with id {user_id} was updated')
+    logger.debug(f'User with id {user_id} was muted')
 
 
 @bot.message_handler(content_types=['audio', 'photo', 'voice', 'video', 'document',
@@ -52,6 +51,7 @@ def count_messages(message):
     :param message: User's sent message
     :return: None
     """
+    print('test')
     sender_id = message.from_user.id
     username = message.from_user.username
     first_name = message.from_user.first_name
@@ -97,7 +97,7 @@ def count_messages(message):
         users_msg_count = cursor.fetchone()[0]
 
         if not username:
-            username = 'Хэй'
+            username = 'ХЭЙ'
         if users_msg_count == 15:
             warning_message = username + WARNING_MESSAGE
             bot.send_message(message.chat.id, warning_message)
